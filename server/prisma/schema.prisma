@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String      @id @default(uuid())
+  clerkId        String      @unique
+  email          String      @unique
+  availableFunds Float       @default(10000.0)
+  role           Role        @default(USER)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  trades         Trade[]
+  portfolio      Portfolio?
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Portfolio {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  totalValue    Float    @default(0.0)
+  totalPnL      Float    @default(0.0)
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id                   String      @id @default(uuid())
+  question             String
+  categories           String[]
+  status               EventStatus @default(PENDING)
+  probability          Float       @default(50.0)
+  totalVolume          Float       @default(0.0)
+  expirationDate       DateTime
+  suggestedProbability Float?
+  estimatedVolume      String?
+  submittedBy          String?
+  poolYes              Float       @default(100.0) 
+  poolNo               Float       @default(100.0)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  trades               Trade[]
+}
+
+enum EventStatus {
+  PENDING
+  APPROVED
+  ACTIVE
+  PAUSED
+  CLOSED
+  RESOLVED
+  REJECTED
+}
+
+model Trade {
+  id        String       @id @default(uuid())
+  userId    String
+  eventId   String
+  type      TradeType
+  position  PositionType
+  shares    Float
+  price     Float
+  totalCost Float
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id])
+  event     Event        @relation(fields: [eventId], references: [id])
+}
+
+enum TradeType {
+  BUY
+  SELL
+}
+
+enum PositionType {
+  YES
+  NO
+}
