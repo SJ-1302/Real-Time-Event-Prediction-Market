@@ -1,62 +1,121 @@
-# System Architecture: Optima Markets
+# Technical Architecture: Optima Markets
 
-Optima Markets is a distributed prediction market platform composed of a React-based frontend and a Node.js/Express backend, joined via real-time WebSocket communication and a PostgreSQL persistence layer.
-
----
-
-## 🏗️ High-Level Design
-The system follows a classic **client-server architecture** with specialized modules for market making (LMSR) and autonomous research (LLM Agent).
-
-### 1. Frontend Layer (React & Vite)
-*   **Architecture**: Component-based architecture using functional React components and custom hooks for business logic.
-*   **State Management**: Localized state management using React Hooks (`useState`, `useMemo`, `useCallback`) ensuring high-performance re-rendering for real-time tickers.
-*   **Networking**: Hybrid approach using REST for transactional data (trades, portfolio) and Socket.io for live market probability streaming.
-*   **Design System**: Optimized for high-density information display using a "Bloomberg Terminal" aesthetic, leveraging Tailwind CSS for structural layout and Framer Motion for micro-interactions.
-
-### 2. Backend Layer (Node.js & Express)
-*   **Routing**: Modular Express router architecture separating `market`, `admin`, `trade`, and `portfolio` domains.
-*   **Middlewares**: 
-    *   **Authentication**: Multi-tier verification allowing both Clerk JWT validation and a bypassed sandbox mode for local development.
-    *   **Transactions**: All trading logic is wrapped in **Prisma Atomic Transactions** (`$transaction`) to ensure data integrity and prevent race conditions during heavy volume.
-*   **Database Layer**: PostgreSQL managed via Prisma ORM for type-safe schema migrations and performance optimization.
+Optima Markets is a high-performance event prediction platform engineered with a distributed micro-service philosophy, utilizing a React frontend and Node.js/Express backend, persisted via PostgreSQL and Prisma ORM.
 
 ---
 
-## 📈 Quantitative Trading Engine (LMSR)
-The platform utilizes the **Logarithmic Market Scoring Rule (LMSR)** to provide continuous liquidity without requiring an order book.
+## 🏛️ System Overview
 
-### Probability Discovery
-The price of a share (outcome probability) is calculated by comparing the relative quantities of "Yes" and "No" shares currently held in the event's global liquidity pool:
-$$P(yes) = \frac{e^{q_{yes}/B}}{e^{q_{yes}/B} + e^{q_{no}/B}}$$
-*Where $B$ is the liquidity parameter controlling price sensitivity.*
+### High-Level Data Flow
+```mermaid
+graph LR
+    subgraph Client
+        UI[React View]
+        Hook[Custom Hooks]
+        Socket[Socket.io Client]
+    end
 
-### Transaction Fulfillment
-When a user places a trade, the system calculates the change in the total cost function. The user pays (or receives) the difference between the post-trade and pre-trade global cost basis:
-$$Cost = B \cdot \ln(e^{newQ_{yes}/B} + e^{newQ_{no}/B}) - B \cdot \ln(e^{oldQ_{yes}/B} + e^{oldQ_{no}/B})$$
+    subgraph Server
+        Exp[Express App]
+        LMSR[Math Service]
+        LLM[Gemini Agent]
+        Cron[Node-Cron]
+    end
+
+    subgraph Persistence
+        PG[(PostgreSQL)]
+        Pris[Prisma]
+    end
+
+    UI <--> Hook
+    Hook <--> Socket
+    Socket <--> Exp
+    Exp <--> LMSR
+    Exp <--> Pris
+    Pris <--> PG
+    Cron --> LLM
+    LLM --> Pris
+```
 
 ---
 
-## 🤖 AI Autonomous Analyst
-The platform features a native research agent integrated via Google Gemini (LLM).
+## 🚀 Frontend Architecture (React)
 
-*   **Generation Pipeline**: A daily `node-cron` daemon triggers a research sweep across global tech, finance, and political trends.
-*   **Event Lifecycle**:
-    1.  **AI Research**: Agent identifies verifiable outcomes and generates structured event data.
-    2.  **Pending Status**: Events are persisted to the database as `PENDING`.
-    3.  **Admin Review**: Administrators approve or reject AI-generated markets via the Admin Portal.
-    4.  **Market Activation**: Approved markets go `ACTIVE`, initializing their LMSR liquidity pools.
+### 1. Atomic Component Design
+The frontend utilizes a modular component architecture based on atomic design principles, ensuring a consistent **Bloomberg Terminal** aesthetic across all views.
+- **Header Layer**: Context-aware navigation with integrated balance and portfolio monitoring.
+- **Market Card Layer**: Information-dense market visualization with real-time probability tickers.
+- **Admin Layer**: Gated views for event lifecycle management.
 
----
-
-## 🗄️ Database Schema
-*   **User**: Stores balances, roles, and identity metadata.
-*   **Event**: Tracks the core market data (question, status, pool depths, volume, and AI metadata).
-*   **Trade**: Logs every individual buy/sell transaction, cost basis, and share count.
-*   **Portfolio**: Aggregates live PnL by evaluating user trade history against real-time event probabilities.
+### 2. Reactive Hooks Layer
+Custom hooks manage the core business logic, abstracting API complexities from the presentation layer:
+- `useMarkets`: Manages global market state, filtering, and real-time Socket.io probability sync.
+- `usePortfolio`: Dynamically calculates PnL by aggregating trade history against current market prices.
+- `useTrade`: Orchestrates complex trade execution, handling 1-second settlement delays and state synchronization.
 
 ---
 
-## 🛠️ Infrastructure & Security
-*   **Docker**: Encapsulates the PostgreSQL database environment for consistent cross-machine deployment.
-*   **Simulated Latency**: A mandatory 1-second settlement delay is implemented at the API layer to mirror professional network clearing environments.
-*   **Real-Time Sync**: Socket.io "rooms" partition data flow so clients only receive updates for the markets they are currently viewing.
+## ⚙️ Backend Architecture (Express & Node.js)
+
+### 1. Modular Controller Structure
+The backend is organized into domain-specific route controllers:
+- **Trade Controller**: Implements a strict atomic transaction pattern (`prisma.$transaction`) to prevent race conditions during heavy volume.
+- **Admin Controller**: Manages the `PENDING -> ACTIVE` transition and resolving markets.
+- **Market Controller**: Optimized for high-throughput reads of active prediction events.
+
+### 2. Transaction Flow (Sequence Diagram)
+```mermaid
+sequenceDiagram
+    participant User
+    participant Router
+    participant TransactionLogic
+    participant LMSR
+    participant Postgres
+    
+    User->>Router: POST /api/trade (BUY YES)
+    Router->>TransactionLogic: Initiate Atomic Transaction
+    TransactionLogic->>LMSR: Calculate Cost Basis (N shares)
+    LMSR-->>TransactionLogic: Returns Cost Magnitude
+    TransactionLogic->>Postgres: Verify Sufficient Balance
+    Postgres-->>TransactionLogic: Affirmative
+    TransactionLogic->>TransactionLogic: **Simulated 1s Settlement Delay**
+    TransactionLogic->>Postgres: Update User Balance & Create Trade Record
+    TransactionLogic->>Postgres: Adjust Event Pool YES (+N)
+    Postgres-->>TransactionLogic: Success
+    TransactionLogic-->>User: Trade Confirmed (JSON)
+```
+
+---
+
+## 📉 Quantitative Engine: LMSR Algorithm
+
+Optima Markets utilizes the **Logarithmic Market Scoring Rule (LMSR)** as its core Automated Market Maker (AMM).
+
+### 1. Probability Inversion
+The spot price ($Price_{yes}$) is defined as the marginal cost of buying an infinitesimally small number of YES shares:
+$$Price_{yes} = \frac{e^{q_{yes}/B}}{e^{q_{yes}/B} + e^{q_{no}/B}}$$
+
+### 2. Portfolio Valuation
+Unlike a traditional stock portfolio, an Optima Markets portfolio is valued dynamically based on current market probabilities. A "YES" share is worth $P(yes)$ while a "NO" share is worth $1.0 - P(yes)$.
+
+---
+
+## 🤖 AI Integration: Autonomous Analyst
+
+The system integrates an autonomous research agent using the **Google Gemini (LLM)** SDK.
+
+### The Cron Lifecycle
+1.  **Ingestion**: At 00:00 UTC, the `node-cron` daemon triggers the Gemini Agent.
+2.  **Synthesis**: The agent scans global trends (finance, politics, tech) and synthesizes 3 engagement-optimized binary questions.
+3.  **Persistance**: Proposals are saved as `PENDING` ensuring human-in-the-loop review.
+4.  **Activation**: Upon Admin approval, the system initializes the LMSR liquidity pools ($poolYes=100$, $poolNo=100$).
+
+---
+
+## 💾 Persistence Layer (Prisma & PostgreSQL)
+The relational schema leverages strict foreign key constraints and atomic operations:
+- **User <-> Trade**: Historically tracks all entry and exit prices.
+- **Event <-> Trade**: Maps every transaction to its specific prediction market.
+- **User <-> Portfolio**: Aggregates live balances and equity.
+
+---

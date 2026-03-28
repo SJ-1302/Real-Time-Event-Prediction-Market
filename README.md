@@ -1,91 +1,139 @@
-# Optima Markets: AI-Driven Prediction Platform
+# Optima Markets: Real-Time Event Prediction Platform
 
-Optima Markets is a high-fidelity, full-stack prediction market platform designed with a professional "Bloomberg Terminal" aesthetic. It allows users to trade on the outcome of real-world events using an advanced automated market maker (AMM) engine, powered by the Logarithmic Market Scoring Rule (LMSR).
+Built a high-fidelity prediction market platform for trading on real-time global events, implementing an advanced **Logarithmic Market Scoring Rule (LMSR)** engine to enable continuous automated liquidity and probability discovery for retail and institutional participants.
 
-**[View Full System Architecture Documentation](ARCHITECTURE.md)**
+## Features
 
----
+### LMSR Quantitative Trading Engine
+- **Continuous Liquidity**: Mathematical AMM ensuring orders can always be filled without an order book.
+- **Dynamic Probability Discovery**: Real-time price adjustments based on global pool depth ($B$ factor).
+- **Atomic Trade Settlement**: Single-transaction buy/sell executions with simulated network latency.
 
-## 🏛️ Core Features
+### AI Autonomous Analyst Agent
+- **Trend Ingestion**: Daily scanning of finance, politics, and tech news via **Google Gemini (LLM)**.
+- **Autonomous Market Creation**: Generates verifiable binary questions with suggested starting probabilities.
+- **Admin Governance**: Lifecycle management for vetting, approving, or rejecting AI-proposed markets.
 
-### 1. High-Fidelity Professional UI
-*   **Bloomberg Aesthetic**: Dark-themed, high-density dashboard designed for professional market participants.
-*   **Real-Time Subscriptions**: Live price and probability updates via Socket.io.
-*   **Dynamic Analytics**: Comprehensive Portfolio and PnL tracking against live market movement.
-
-### 2. Quantitative Trading Engine (LMSR)
-*   **Automated Liquidity**: Implements the LMSR cost function for continuous, mathematical probability discovery.
-*   **Volatile Liquidity Parameters**: Set with high-swing sensitivity ($B=100$) for rapid price action on global news.
-*   **Atomic Settlement**: Secure, transaction-based share distribution with simulated network latency for realism.
-
-### 3. AI-Autonomous Analyst Agent
-*   **Trend Scanning**: Daily automated news ingestion using Google Gemini (LLM) to identify emerging global events.
-*   **Intelligent Market Creation**: AI-generated market questions with suggested starting probabilities and volume estimations.
-*   **Admin Approval Workflow**: Human-in-the-loop lifecycle for vetting AI-proposed events.
+### Interactive Dashboard (3 Unified Views)
+1. **Market Explorer** — Live event cards with Bloomberg-style aesthetics and real-time tickers.
+2. **Portfolio Analytics** — Live PnL tracking, balance management, and trade history.
+3. **Admin Portal** — Full-stack management of the event pipeline and platform user base.
 
 ---
 
-## 💻 Tech Stack
+## 🏗️ Architecture
 
-*   **Frontend**: React 18, Vite, Tailwind CSS, Motion (Framer), React Router 6.
-*   **Backend**: Node.js, Express, Socket.io, Node-Cron.
-*   **Database**: PostgreSQL, Prisma ORM.
-*   **AI**: Google Generative AI (Gemini Flash).
-*   **Authentication**: Clerk Auth (Production) / JIT Sandbox Proxy (Development).
+### System Data Flow
+```mermaid
+graph TD
+    subgraph Frontend
+    RC[React Components] --> hooks[Custom Hooks: useMarkets/usePortfolio]
+    hooks --> API[API Service: fetch/Socket.io]
+    end
 
----
+    subgraph Backend
+    API --> Express[Express Server]
+    Express --> Auth[Auth Middleware]
+    Auth --> Routes[Route Controllers]
+    Routes --> LMSR[LMSR Math Logic]
+    end
 
-## 🛠️ Installation & Setup
+    subgraph Persistence
+    LMSR --> Prisma[Prisma ORM]
+    Prisma --> PG[(PostgreSQL)]
+    end
 
-### Prerequisites
-*   Node.js (v18+)
-*   Docker (for PostgreSQL) or a local PostgreSQL instance.
-
-### 1. Clone & Install
-```bash
-git clone https://github.com/SJ-1302/Real-Time-Event-Prediction-Market.git
-cd Real-Time-Event-Prediction-Market
-npm install
-cd server && npm install
+    subgraph Automation
+    Cron[Node-Cron Scheduler] --> Gemini[Gemini AI Agent]
+    Gemini --> Routes
+    end
 ```
 
-### 2. Environment Variables
-Create a `.env` file in the `server/` directory:
+### Directory Structure
+```
+Real-Time-Event-Prediction-Market/
+├── server/                    # Express Backend
+│   ├── src/
+│   │   ├── routes/            # Market, Trade, Admin, Portfolio
+│   │   ├── services/          # LMSR Engine, LLM Agent
+│   │   └── middleware/        # Auth Interceptors
+│   └── prisma/                # DB Schema & Migrations
+├── src/                       # React Frontend
+│   ├── components/            # Bloomberg-style UI modules
+│   ├── hooks/                 # Data Fetching & WebSockets
+│   ├── services/              # API Client Logic
+│   └── types/                 # Strict TypeScript Definitions
+└── README.md                  # This file
+```
+
+---
+
+## 📈 Quantitative Engine: LMSR Math
+
+### Probability Calculation
+The system calculates the real-time probability of a "YES" outcome by evaluating the relative volume of shares in each pool:
+
+$$P(yes) = \frac{e^{poolYes / B}}{e^{poolYes / B} + e^{poolNo / B}}$$
+
+| Variable | Description | Value |
+|-------|-------------|---------|
+| **Pool (Yes/No)** | Current total shares held in the pool | Dynamic |
+| **B parameter** | Liquidity depth/sensitivity | **100.0 (High Volatility)** |
+
+### Cost Function
+The cost for a user to buy $N$ shares is the difference in the global cost function before and after the trade:
+
+$$Cost = B \cdot \ln(e^{newYes / B} + e^{newNo / B}) - B \cdot \ln(e^{oldYes / B} + e^{oldNo / B})$$
+
+---
+
+## 🚀 Quick Start
+
+### 1. Configure Environment
+Create `server/.env` with your credentials:
 ```env
 PORT=4000
-FRONTEND_URL=http://localhost:3000
-DATABASE_URL=postgresql://user:pass@localhost:5432/db_name?schema=public
-GEMINI_API_KEY=your_key_here
-SECRET_KEY=sk_test_... # Clerk Secret Key
+DATABASE_URL=postgresql://user:pass@localhost:5432/db
+GEMINI_API_KEY=your_key
 ```
 
-### 3. Database Initialization
+### 2. Initialize Backend
 ```bash
 cd server
+npm install
 npx prisma generate
-npx prisma db push
-```
-
-### 4. Direct Launch
-**Backend**:
-```bash
-cd server
 npm run dev
 ```
 
-**Frontend**:
+### 3. Launch Frontend
 ```bash
+npm install
 npm run dev
 ```
 
----
-
-## 📈 Trading Logic Highlights (LMSR)
-Optima Markets uses a continuous scoring rule to determine prices. Every trade is normalized against the global liquidity pool $B$.
-*   **Yes Probability**: $e^{\frac{q_{yes}}{B}} / (e^{\frac{q_{yes}}{B}} + e^{\frac{q_{no}}{B}})$
-*   **No Probability**: $1.0 - P(yes)$
+The dashboard will be available at `http://localhost:3000`.
 
 ---
 
-## 📄 License
-MIT License. Built for the future of decentralized and AI-driven predictive analytics. 🚀
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| **Frontend** | React 18, Vite, Framer Motion |
+| **Styling** | Vanilla CSS + Tailwind |
+| **Backend** | Node.js, Express |
+| **Database** | PostgreSQL, Prisma |
+| **Real-time** | Socket.io |
+| **AI Agent** | Google Gemini SDK |
+
+---
+
+## Key Design Decisions
+
+1. **Bloomberg Terminal Aesthetics**: High-density information display using a dark, premium color palette and condensed typography for a professional feel.
+2. **Deterministic Pricing**: Abandoning traditional order books for an LMSR-based AMM to ensure instant liquidity regardless of trade size.
+3. **Simulated Settlement**: Mandatory 1-second delay implemented on the backend to simulate realistic clearinghouse settlement times.
+4. **Just-In-Time User Creation**: Sandbox auth middleware that seeds a $10,000 test account automatically for local evaluation.
+5. **AI-First Generation**: An autonomous cron loop that identified trending global news and populates the market list without manual intervention.
+
+---
