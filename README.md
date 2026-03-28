@@ -2,6 +2,8 @@
 
 Optima Markets is a high-fidelity, full-stack prediction market platform designed with a professional "Bloomberg Terminal" aesthetic. It allows users to trade on the outcome of real-world events using an advanced automated market maker (AMM) engine, powered by the Logarithmic Market Scoring Rule (LMSR).
 
+**[View Full System Architecture Documentation](ARCHITECTURE.md)**
+
 ---
 
 ## 🏛️ Core Features
